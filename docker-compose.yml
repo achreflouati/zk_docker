@@ -1,0 +1,136 @@
+version: "3.8"
+
+# ── ZK HRMS — Docker Compose ─────────────────────────────────────────────────
+# Frappe v15 + ERPNext v15 + HRMS + zk_hrms
+#
+# AVANT DE LANCER:
+#   1. Builder l'image: .\build.ps1     (PowerShell Windows)
+#   2. Démarrer: docker compose up -d
+#   3. Créer le site (une seule fois): docker compose exec backend bash /workspace/init-site.sh
+
+x-backend-defaults: &backend-defaults
+  image: achreflouati/zk-hrms:v15
+  restart: unless-stopped
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - ./init-site.sh:/workspace/init-site.sh:ro
+  environment:
+    - DB_HOST=db
+    - DB_PORT=3306
+    - REDIS_CACHE=redis-cache:6379
+    - REDIS_QUEUE=redis-queue:6379
+    - SOCKETIO_PORT=9000
+
+services:
+
+  # ── MariaDB ────────────────────────────────────────────────────────────────
+  db:
+    image: mariadb:10.6
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-padmin"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # ── Redis Cache ────────────────────────────────────────────────────────────
+  redis-cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # ── Redis Queue ────────────────────────────────────────────────────────────
+  redis-queue:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # ── Configurator (run once at startup) ────────────────────────────────────
+  configurator:
+    <<: *backend-defaults
+    restart: "no"
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host db;
+        bench set-config -gp db_port 3306;
+        bench set-config -g redis_cache "redis://redis-cache:6379";
+        bench set-config -g redis_queue "redis://redis-queue:6379";
+        bench set-config -g redis_socketio "redis://redis-queue:6379";
+        bench set-config -gp socketio_port 9000;
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Frappe Backend (gunicorn) ──────────────────────────────────────────────
+  backend:
+    <<: *backend-defaults
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  # ── Socket.IO ──────────────────────────────────────────────────────────────
+  websocket:
+    <<: *backend-defaults
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
+    depends_on:
+      - backend
+
+  # ── Workers ────────────────────────────────────────────────────────────────
+  worker-short:
+    <<: *backend-defaults
+    command: bench worker --queue short,default
+    depends_on:
+      - backend
+
+  worker-long:
+    <<: *backend-defaults
+    command: bench worker --queue long,default
+    depends_on:
+      - backend
+
+  # ── Scheduler ─────────────────────────────────────────────────────────────
+  scheduler:
+    <<: *backend-defaults
+    command: bench schedule
+    depends_on:
+      - backend
+
+  # ── Nginx (frontend + reverse proxy) ──────────────────────────────────────
+  frontend:
+    image: achreflouati/zk-hrms:v15
+    restart: unless-stopped
+    command:
+      - nginx-entrypoint.sh
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: zkhrms.localhost
+      UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: "120"
+      CLIENT_MAX_BODY_SIZE: 50m
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+    ports:
+      - "80:8080"
+    depends_on:
+      - backend
+      - websocket
+
+volumes:
+  db-data:
+  sites:
