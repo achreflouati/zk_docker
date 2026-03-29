@@ -58,7 +58,15 @@ services:
 
   backend:
     <<: *backend-defaults
-    command: ["bench", "serve", "--port", "8000"]
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        cd /home/frappe/frappe-bench/apps/zk_hrms &&
+        git pull --ff-only 2>/dev/null || true &&
+        cd /home/frappe/frappe-bench &&
+        bench serve --port 8000
+    cap_add:
+      - NET_RAW
     depends_on:
       configurator:
         condition: service_completed_successfully
@@ -71,13 +79,29 @@ services:
 
   worker-short:
     <<: *backend-defaults
-    command: ["bench", "worker", "--queue", "short,default"]
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        cd /home/frappe/frappe-bench/apps/zk_hrms &&
+        git pull --ff-only 2>/dev/null || true &&
+        cd /home/frappe/frappe-bench &&
+        bench worker --queue short,default
+    cap_add:
+      - NET_RAW
     depends_on:
       - backend
 
   worker-long:
     <<: *backend-defaults
-    command: ["bench", "worker", "--queue", "long,default"]
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        cd /home/frappe/frappe-bench/apps/zk_hrms &&
+        git pull --ff-only 2>/dev/null || true &&
+        cd /home/frappe/frappe-bench &&
+        bench worker --queue long,default
+    cap_add:
+      - NET_RAW
     depends_on:
       - backend
 
