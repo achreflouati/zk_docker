@@ -64,6 +64,7 @@ services:
         cd /home/frappe/frappe-bench/apps/zk_hrms &&
         git pull --ff-only 2>/dev/null || true &&
         cd /home/frappe/frappe-bench &&
+        bench build --app zk_hrms --hard-link 2>/dev/null || true &&
         bench serve --port 8000
     cap_add:
       - NET_RAW
