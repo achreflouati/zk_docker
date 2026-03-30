@@ -42,9 +42,14 @@ echo "[4/5] Installation ZK HRMS..."
 bench --site "$SITE" install-app zk_hrms
 
 echo ""
-echo "[5/5] Configuration finale..."
+echo "[5/6] Configuration finale..."
 bench --site "$SITE" set-config allow_cors 1
 bench use "$SITE"
+
+echo ""
+echo "[6/6] Branding LSI HRMS + Module Profile HR..."
+bench --site "$SITE" build --app zk_hrms
+bench --site "$SITE" execute zk_hrms.setup_lsi.run
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -54,4 +59,5 @@ echo " 🌐 Ouvrir : http://localhost"
 echo " 👤 Login  : Administrator"
 echo " 🔑 Mot de passe : $ADMIN_PASS"
 echo " 📊 ZK Dashboard : http://localhost/app/zk-dashboard"
+echo " 🎨 Thème  : LSI HRMS (bleu)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
