@@ -136,13 +136,7 @@ services:
         git pull --ff-only 2>/dev/null || true &&
         cd /home/frappe/frappe-bench &&
         bench build --app zk_hrms --hard-link 2>/dev/null || true &&
-        ./env/bin/gunicorn
-        --bind 0.0.0.0:8000
-        --workers 2
-        --timeout 120
-        --max-requests 1000
-        --max-requests-jitter 100
-        frappe.app:application
+        bench serve --port 8000
     cap_add:
       - NET_RAW
     depends_on:
