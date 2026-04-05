@@ -56,6 +56,77 @@ services:
       db:
         condition: service_healthy
 
+  # ── Création automatique du site (première installation uniquement) ──────────
+  create-site:
+    <<: *backend-defaults
+    restart: "no"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - REDIS_CACHE=redis-cache:6379
+      - REDIS_QUEUE=redis-queue:6379
+      - SOCKETIO_PORT=9000
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        set -e
+        SITE="zkhrms.localhost"
+        cd /home/frappe/frappe-bench
+
+        # Idempotent — skip if site already exists
+        if [ -f "sites/$SITE/site_config.json" ]; then
+          echo "✅  Site $SITE already exists — skipping creation"
+          exit 0
+        fi
+
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo " ZK HRMS — Première installation"
+        echo " Mot de passe administrateur : ${ADMIN_PASSWORD}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        echo ""
+        echo "[1/6] Création du site..."
+        bench new-site "$SITE" \
+          --db-root-password admin \
+          --admin-password "${ADMIN_PASSWORD}" \
+          --no-mariadb-socket
+
+        echo ""
+        echo "[2/6] Installation ERPNext..."
+        bench --site "$SITE" install-app erpnext
+
+        echo ""
+        echo "[3/6] Installation HRMS..."
+        bench --site "$SITE" install-app hrms
+
+        echo ""
+        echo "[4/6] Installation ZK HRMS..."
+        bench --site "$SITE" install-app zk_hrms
+
+        echo ""
+        echo "[5/6] Configuration..."
+        bench --site "$SITE" set-config allow_cors 1
+        bench use "$SITE"
+
+        echo ""
+        echo "[6/6] Branding LSI HRMS..."
+        bench --site "$SITE" execute zk_hrms.setup_lsi.run 2>/dev/null || true
+
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo " ✅  Installation terminée !"
+        echo ""
+        echo " 🌐  URL        : http://localhost"
+        echo " 👤  Login      : Administrator"
+        echo " 🔑  Mot de passe : ${ADMIN_PASSWORD}"
+        echo " 📊  Dashboard  : http://localhost/app/zk-dashboard"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
   backend:
     <<: *backend-defaults
     entrypoint: ["bash", "-c"]
@@ -69,7 +140,7 @@ services:
     cap_add:
       - NET_RAW
     depends_on:
-      configurator:
+      create-site:
         condition: service_completed_successfully
 
   websocket:
