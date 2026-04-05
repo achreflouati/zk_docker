@@ -131,12 +131,20 @@ services:
     <<: *backend-defaults
     entrypoint: ["bash", "-c"]
     command:
-      - >
-        cd /home/frappe/frappe-bench/apps/zk_hrms &&
-        git pull --ff-only 2>/dev/null || true &&
-        cd /home/frappe/frappe-bench &&
-        bench build --app zk_hrms --hard-link 2>/dev/null || true &&
-        bench serve --port 8000
+      - |
+        set -e
+        cd /home/frappe/frappe-bench/apps/zk_hrms
+        BEFORE=$(git rev-parse HEAD 2>/dev/null || echo "none")
+        git pull --ff-only 2>/dev/null || true
+        AFTER=$(git rev-parse HEAD 2>/dev/null || echo "none")
+        cd /home/frappe/frappe-bench
+        if [ "$BEFORE" != "$AFTER" ] || [ ! -f sites/assets/zk_hrms/css/zk_hrms.css ] && [ ! -f sites/assets/zk_hrms/js/zk_dashboard.js ]; then
+          echo "📦 Nouveaux commits détectés ou assets manquants — build en cours..."
+          bench build --app zk_hrms --hard-link 2>/dev/null || true
+        else
+          echo "✅ Pas de changement JS/CSS — build ignoré (démarrage rapide)"
+        fi
+        exec bench serve --port 8000
     cap_add:
       - NET_RAW
     depends_on:
