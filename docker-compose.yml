@@ -134,11 +134,11 @@ services:
       - |
         set -e
         cd /home/frappe/frappe-bench/apps/zk_hrms
-        BEFORE=$(git rev-parse HEAD 2>/dev/null || echo "none")
+        BEFORE=$$(git rev-parse HEAD 2>/dev/null || echo "none")
         git pull --ff-only 2>/dev/null || true
-        AFTER=$(git rev-parse HEAD 2>/dev/null || echo "none")
+        AFTER=$$(git rev-parse HEAD 2>/dev/null || echo "none")
         cd /home/frappe/frappe-bench
-        if [ "$BEFORE" != "$AFTER" ] || [ ! -f sites/assets/zk_hrms/css/zk_hrms.css ] && [ ! -f sites/assets/zk_hrms/js/zk_dashboard.js ]; then
+        if [ "$$BEFORE" != "$$AFTER" ] || [ ! -f sites/assets/zk_hrms/css/zk_hrms.css ] && [ ! -f sites/assets/zk_hrms/js/zk_dashboard.js ]; then
           echo "📦 Nouveaux commits détectés ou assets manquants — build en cours..."
           bench build --app zk_hrms --hard-link 2>/dev/null || true
         else
