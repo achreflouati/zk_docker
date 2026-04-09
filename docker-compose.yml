@@ -147,6 +147,10 @@ services:
         exec bench serve --port 8000
     cap_add:
       - NET_RAW
+    networks:
+      default:
+        aliases:
+          - zkhrms.localhost
     depends_on:
       create-site:
         condition: service_completed_successfully
