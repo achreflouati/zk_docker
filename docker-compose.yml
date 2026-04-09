@@ -147,10 +147,6 @@ services:
         exec bench serve --port 8000
     cap_add:
       - NET_RAW
-    networks:
-      default:
-        aliases:
-          - zkhrms.localhost
     depends_on:
       create-site:
         condition: service_completed_successfully
@@ -203,6 +199,10 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - sites:/usr/share/nginx/sites:ro
+    networks:
+      default:
+        aliases:
+          - zkhrms.localhost
     depends_on:
       - backend
       - websocket
